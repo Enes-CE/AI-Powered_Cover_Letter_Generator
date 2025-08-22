@@ -1,25 +1,46 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, User, Send, Download } from 'lucide-react'
+import { FileText, User, Send, Download, CheckCircle, AlertCircle } from 'lucide-react'
+import { api, CoverLetterResponse, APIError } from '@/lib/api'
 
 export default function Home() {
   const [jobPosting, setJobPosting] = useState('')
   const [cvData, setCvData] = useState('')
-  const [tone, setTone] = useState('formal')
+  const [tone, setTone] = useState<'formal' | 'friendly' | 'concise'>('formal')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [coverLetter, setCoverLetter] = useState<CoverLetterResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isSuccess, setIsSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsGenerating(true)
+    setError(null)
+    setIsSuccess(false)
     
-    // TODO: Implement API call
-    console.log('Generating cover letter...', { jobPosting, cvData, tone })
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await api.generateCoverLetter({
+        job_posting: {
+          job_posting_text: jobPosting
+        },
+        cv_data: {
+          cv_text: cvData
+        },
+        tone: tone
+      })
+      
+      setCoverLetter(response)
+      setIsSuccess(true)
+    } catch (err) {
+      if (err instanceof APIError) {
+        setError(`API Error: ${err.message}`)
+      } else {
+        setError('An unexpected error occurred. Please try again.')
+      }
+    } finally {
       setIsGenerating(false)
-    }, 2000)
+    }
   }
 
   return (
@@ -122,6 +143,87 @@ export default function Home() {
             </div>
           </form>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-6 card border-l-4 border-red-500 bg-red-50">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+              <p className="text-red-700">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {isSuccess && (
+          <div className="mt-6 card border-l-4 border-green-500 bg-green-50">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+              <p className="text-green-700">Cover letter generated successfully!</p>
+            </div>
+          </div>
+        )}
+
+        {/* Cover Letter Result */}
+        {coverLetter && (
+          <div className="mt-6 card">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Generated Cover Letter</h3>
+            
+            {/* Cover Letter Text */}
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+              <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans">
+                {coverLetter.cover_letter}
+              </pre>
+            </div>
+
+            {/* Analysis Results */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Skill Matches */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Skill Analysis</h4>
+                <div className="space-y-2">
+                  {coverLetter.skill_matches.map((match, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-sm">{match.skill}</span>
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        match.matched 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {match.matched ? '✓' : '✗'} {Math.round(match.confidence * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Recommendations</h4>
+                <ul className="space-y-2">
+                  {coverLetter.recommendations.map((rec, index) => (
+                    <li key={index} className="text-sm text-gray-700 flex items-start">
+                      <span className="text-blue-500 mr-2">•</span>
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Export Buttons */}
+            <div className="mt-6 flex gap-3">
+              <button className="btn-secondary flex items-center space-x-2">
+                <Download className="h-4 w-4" />
+                <span>Download PDF</span>
+              </button>
+              <button className="btn-secondary flex items-center space-x-2">
+                <Download className="h-4 w-4" />
+                <span>Download DOCX</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Features */}
         <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
