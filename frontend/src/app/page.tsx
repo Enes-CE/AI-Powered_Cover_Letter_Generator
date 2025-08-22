@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { FileText, User, Send, Download, CheckCircle, AlertCircle, Copy } from 'lucide-react'
 import { api, CoverLetterResponse, CoverLetterBatchResponse, APIError } from '@/lib/api'
+import { ExportButtons } from '@/components/ExportButtons'
+import { PdfUpload } from '@/components/PdfUpload'
+import { Toast } from '@/components/Toast'
 
 export default function Home() {
   const [jobPosting, setJobPosting] = useState('')
@@ -11,10 +14,13 @@ export default function Home() {
   const [variants, setVariants] = useState(1)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadedFileName, setUploadedFileName] = useState<string>('')
   const [coverLetter, setCoverLetter] = useState<CoverLetterResponse | null>(null)
   const [coverLetterBatch, setCoverLetterBatch] = useState<CoverLetterBatchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -34,19 +40,27 @@ export default function Home() {
     
     try {
       setError(null) // Clear previous errors
+      setIsUploading(true)
+      setUploadedFileName(file.name)
+      
       const { text } = await api.extractCvTextFromPdf(file)
       
       if (text && text.trim().length > 0) {
         setCvData(text)
       } else {
         setError('PDF\'den metin çıkarılamadı. Dosya görsel tabanlı olabilir.')
+        setUploadedFileName('')
       }
     } catch (err) {
       if (err instanceof APIError) {
         setError(`PDF Hatası: ${err.message}`)
       } else {
+        console.error('PDF upload error:', err)
         setError('PDF okunamadı. Lütfen geçerli bir PDF yükleyin.')
       }
+      setUploadedFileName('')
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -77,11 +91,14 @@ export default function Home() {
         setCoverLetter(response as CoverLetterResponse)
       }
       setIsSuccess(true)
+      setToast({ type: 'success', message: `Cover letter${variants > 1 ? 's' : ''} generated successfully!` })
     } catch (err) {
       if (err instanceof APIError) {
         setError(`API Error: ${err.message}`)
+        setToast({ type: 'error', message: `API Error: ${err.message}` })
       } else {
         setError('An unexpected error occurred. Please try again.')
+        setToast({ type: 'error', message: 'An unexpected error occurred. Please try again.' })
       }
     } finally {
       setIsGenerating(false)
@@ -90,6 +107,7 @@ export default function Home() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
+    setToast({ type: 'success', message: 'Cover letter copied to clipboard!' })
   }
 
   const downloadFile = (blob: Blob, filename: string) => {
@@ -108,8 +126,10 @@ export default function Home() {
     try {
       const blob = await api.exportPdf(letter, jobTitle, companyName)
       downloadFile(blob, `cover_letter_${companyName.replace(/\s+/g, '_')}_${jobTitle.replace(/\s+/g, '_')}.pdf`)
+      setToast({ type: 'success', message: 'PDF exported successfully!' })
     } catch (err) {
       setError('PDF export failed. Please try again.')
+      setToast({ type: 'error', message: 'PDF export failed. Please try again.' })
     } finally {
       setIsExporting(false)
     }
@@ -120,8 +140,10 @@ export default function Home() {
     try {
       const blob = await api.exportDocx(letter, jobTitle, companyName)
       downloadFile(blob, `cover_letter_${companyName.replace(/\s+/g, '_')}_${jobTitle.replace(/\s+/g, '_')}.docx`)
+      setToast({ type: 'success', message: 'DOCX exported successfully!' })
     } catch (err) {
       setError('DOCX export failed. Please try again.')
+      setToast({ type: 'error', message: 'DOCX export failed. Please try again.' })
     } finally {
       setIsExporting(false)
     }
@@ -186,10 +208,12 @@ export default function Home() {
                 className="input-field h-32 resize-none"
                 required
               />
-              <div className="mt-2">
-                <input type="file" accept="application/pdf" onChange={handlePdfUpload} />
-                <p className="text-xs text-gray-500 mt-1">PDF yükleyin; metin otomatik doldurulur.</p>
-              </div>
+              <PdfUpload
+                onFileSelect={handlePdfUpload}
+                isUploading={isUploading}
+                fileName={uploadedFileName}
+                error={error}
+              />
             </div>
 
             {/* Tone and Variants Selection */}
@@ -329,32 +353,22 @@ export default function Home() {
             </div>
 
             {/* Export Buttons */}
-            <div className="mt-6 flex gap-3">
-              <button 
-                onClick={() => handleExportPdf(
-                  coverLetter.cover_letter, 
-                  coverLetter.analysis.position_title || 'Position',
-                  coverLetter.analysis.company_name || 'Company'
-                )}
-                disabled={isExporting}
-                className="btn-secondary flex items-center space-x-2 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-                <span>{isExporting ? 'Exporting...' : 'Download PDF'}</span>
-              </button>
-              <button 
-                onClick={() => handleExportDocx(
-                  coverLetter.cover_letter, 
-                  coverLetter.analysis.position_title || 'Position',
-                  coverLetter.analysis.company_name || 'Company'
-                )}
-                disabled={isExporting}
-                className="btn-secondary flex items-center space-x-2 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-                <span>{isExporting ? 'Exporting...' : 'Download DOCX'}</span>
-              </button>
-            </div>
+            <ExportButtons
+              coverLetter={coverLetter.cover_letter}
+              jobTitle={coverLetter.analysis.position_title || 'Position'}
+              companyName={coverLetter.analysis.company_name || 'Company'}
+              isExporting={isExporting}
+              onExportPdf={() => handleExportPdf(
+                coverLetter.cover_letter, 
+                coverLetter.analysis.position_title || 'Position',
+                coverLetter.analysis.company_name || 'Company'
+              )}
+              onExportDocx={() => handleExportDocx(
+                coverLetter.cover_letter, 
+                coverLetter.analysis.position_title || 'Position',
+                coverLetter.analysis.company_name || 'Company'
+              )}
+            />
           </div>
         )}
 
@@ -389,10 +403,19 @@ export default function Home() {
                         coverLetterBatch.analysis.company_name || 'Company'
                       )}
                       disabled={isExporting}
-                      className="btn-secondary flex items-center space-x-2 disabled:opacity-50 text-xs"
+                      className="group flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md"
                     >
-                      <Download className="h-3 w-3" />
-                      <span>{isExporting ? 'Exporting...' : 'PDF'}</span>
+                      {isExporting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                          <span>Exporting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-3 w-3 mr-1 group-hover:scale-110 transition-transform" />
+                          <span>PDF</span>
+                        </>
+                      )}
                     </button>
                     <button 
                       onClick={() => handleExportDocx(
@@ -401,10 +424,19 @@ export default function Home() {
                         coverLetterBatch.analysis.company_name || 'Company'
                       )}
                       disabled={isExporting}
-                      className="btn-secondary flex items-center space-x-2 disabled:opacity-50 text-xs"
+                      className="group flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md"
                     >
-                      <Download className="h-3 w-3" />
-                      <span>{isExporting ? 'Exporting...' : 'DOCX'}</span>
+                      {isExporting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                          <span>Exporting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-3 w-3 mr-1 group-hover:scale-110 transition-transform" />
+                          <span>DOCX</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -475,6 +507,15 @@ export default function Home() {
           </div>
         </div>
       </main>
+      
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   )
 }
