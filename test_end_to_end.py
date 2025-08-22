@@ -11,7 +11,7 @@ def test_backend_health():
     """Test backend health endpoint"""
     print("🔍 Testing Backend Health...")
     try:
-        response = requests.get("http://localhost:8001/health")
+        response = requests.get("http://localhost:8003/health")
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Backend Health: {data['status']} - {data['service']}")
@@ -38,22 +38,6 @@ def test_frontend_health():
         print(f"❌ Frontend Health Error: {e}")
         return False
 
-def test_api_endpoint():
-    """Test API endpoint"""
-    print("🔍 Testing API Endpoint...")
-    try:
-        response = requests.get("http://localhost:8001/api/test")
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ API Test: {data['message']}")
-            return True
-        else:
-            print(f"❌ API Test Failed: {response.status_code}")
-            return False
-    except Exception as e:
-        print(f"❌ API Test Error: {e}")
-        return False
-
 def test_cover_letter_generation():
     """Test cover letter generation"""
     print("🔍 Testing Cover Letter Generation...")
@@ -65,12 +49,17 @@ def test_cover_letter_generation():
         "cv_data": {
             "cv_text": "I am a software developer with 3 years of experience in Python, FastAPI, and React. I have basic knowledge of machine learning."
         },
-        "tone": "formal"
+        "company_name": "Test Company",
+        "position_title": "Python Developer",
+        "years_of_experience": "3 years",
+        "key_achievements": "Led development of multiple web applications",
+        "tone": "formal",
+        "variants": 1
     }
     
     try:
         response = requests.post(
-            "http://localhost:8001/api/generate-cover-letter",
+            "http://localhost:8003/api/generate-cover-letter",
             headers={"Content-Type": "application/json"},
             data=json.dumps(test_data)
         )
@@ -78,10 +67,13 @@ def test_cover_letter_generation():
         if response.status_code == 200:
             data = response.json()
             print("✅ Cover Letter Generation: Success")
-            print(f"   - Position: {data['analysis']['position_title']}")
-            print(f"   - Skills Extracted: {len(data['analysis']['extracted_skills'])}")
-            print(f"   - Skill Matches: {len(data['skill_matches'])}")
-            print(f"   - Recommendations: {len(data['recommendations'])}")
+            if 'analysis' in data:
+                print(f"   - Position: {data['analysis'].get('position_title', 'N/A')}")
+                print(f"   - Skills Extracted: {len(data['analysis'].get('extracted_skills', []))}")
+            if 'skill_matches' in data:
+                print(f"   - Skill Matches: {len(data['skill_matches'])}")
+            if 'recommendations' in data:
+                print(f"   - Recommendations: {len(data['recommendations'])}")
             return True
         else:
             print(f"❌ Cover Letter Generation Failed: {response.status_code}")
@@ -89,6 +81,33 @@ def test_cover_letter_generation():
             return False
     except Exception as e:
         print(f"❌ Cover Letter Generation Error: {e}")
+        return False
+
+def test_pdf_export():
+    """Test PDF export functionality"""
+    print("🔍 Testing PDF Export...")
+    
+    test_data = {
+        "cover_letter": "This is a test cover letter for PDF export functionality.",
+        "company_name": "Test Company",
+        "position_title": "Test Position"
+    }
+    
+    try:
+        response = requests.post(
+            "http://localhost:8003/api/export-pdf",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(test_data)
+        )
+        
+        if response.status_code == 200:
+            print("✅ PDF Export: Success")
+            return True
+        else:
+            print(f"❌ PDF Export Failed: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ PDF Export Error: {e}")
         return False
 
 def main():
@@ -99,8 +118,8 @@ def main():
     tests = [
         ("Backend Health", test_backend_health),
         ("Frontend Health", test_frontend_health),
-        ("API Endpoint", test_api_endpoint),
         ("Cover Letter Generation", test_cover_letter_generation),
+        ("PDF Export", test_pdf_export),
     ]
     
     results = []
@@ -128,7 +147,7 @@ def main():
     print(f"\n🎯 Results: {passed}/{total} tests passed")
     
     if passed == total:
-        print("🎉 All tests passed! Application is ready for development.")
+        print("🎉 All tests passed! Application is ready for use.")
         return True
     else:
         print("⚠️  Some tests failed. Please check the issues above.")

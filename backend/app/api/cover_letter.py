@@ -158,7 +158,8 @@ async def export_cover_letter_pdf(request: ExportRequest):
                 parent=styles['Heading1'],
                 fontSize=16,
                 spaceAfter=30,
-                alignment=1  # Center alignment
+                alignment=1,  # Center alignment
+                encoding='utf-8'
             )
             
             normal_style = ParagraphStyle(
@@ -166,19 +167,20 @@ async def export_cover_letter_pdf(request: ExportRequest):
                 parent=styles['Normal'],
                 fontSize=11,
                 spaceAfter=12,
-                leading=14
+                leading=14,
+                encoding='utf-8'
             )
             
             # Build PDF content
             story = []
             
             # Title
-            story.append(Paragraph(f"Cover Letter - {request.job_title}", title_style))
+            story.append(Paragraph(f"Cover Letter - {request.position_title}", title_style))
             story.append(Spacer(1, 20))
             
             # Company info
             story.append(Paragraph(f"<b>Company:</b> {request.company_name}", normal_style))
-            story.append(Paragraph(f"<b>Position:</b> {request.job_title}", normal_style))
+            story.append(Paragraph(f"<b>Position:</b> {request.position_title}", normal_style))
             story.append(Spacer(1, 20))
             
             # Cover letter content
@@ -195,7 +197,7 @@ async def export_cover_letter_pdf(request: ExportRequest):
             return FileResponse(
                 tmp_file.name,
                 media_type='application/pdf',
-                filename=f'cover_letter_{request.company_name.replace(" ", "_")}_{request.job_title.replace(" ", "_")}.pdf'
+                filename=f'cover_letter_{request.company_name.replace(" ", "_")}_{request.position_title.replace(" ", "_")}.pdf'
             )
             
     except Exception as e:
@@ -215,12 +217,12 @@ async def export_cover_letter_docx(request: ExportRequest):
             doc = Document()
             
             # Title
-            title = doc.add_heading(f'Cover Letter - {request.job_title}', 0)
+            title = doc.add_heading(f'Cover Letter - {request.position_title}', 0)
             title.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
             # Company info
             doc.add_paragraph(f'Company: {request.company_name}')
-            doc.add_paragraph(f'Position: {request.job_title}')
+            doc.add_paragraph(f'Position: {request.position_title}')
             doc.add_paragraph('')  # Empty line
             
             # Cover letter content
@@ -236,7 +238,7 @@ async def export_cover_letter_docx(request: ExportRequest):
             return FileResponse(
                 tmp_file.name,
                 media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                filename=f'cover_letter_{request.company_name.replace(" ", "_")}_{request.job_title.replace(" ", "_")}.docx'
+                filename=f'cover_letter_{request.company_name.replace(" ", "_")}_{request.position_title.replace(" ", "_")}.docx'
             )
             
     except Exception as e:

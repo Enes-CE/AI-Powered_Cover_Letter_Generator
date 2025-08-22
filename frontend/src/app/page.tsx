@@ -115,10 +115,8 @@ export default function Home() {
     }
   }
 
-  const downloadFile = async (url: string, filename: string) => {
+  const downloadFile = async (blob: Blob, filename: string) => {
     try {
-      const response = await fetch(url)
-      const blob = await response.blob()
       const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = downloadUrl
@@ -142,13 +140,9 @@ export default function Home() {
       const company = companyName || 'Company'
       const position = positionTitle || 'Position'
       
-      const response = await api.exportPdf({
-        cover_letter: content,
-        company_name: company,
-        position_title: position
-      })
+      const response = await api.exportPdf(content, position, company)
       
-      downloadFile(response.url, `cover-letter-${company}-${position}.pdf`)
+      downloadFile(response, `cover-letter-${company}-${position}.pdf`)
       setToast({ type: 'success', message: 'PDF başarıyla indirildi!' })
     } catch (error) {
       console.error('PDF export error:', error)
@@ -168,13 +162,9 @@ export default function Home() {
       const company = companyName || 'Company'
       const position = positionTitle || 'Position'
       
-      const response = await api.exportDocx({
-        cover_letter: content,
-        company_name: company,
-        position_title: position
-      })
+      const response = await api.exportDocx(content, position, company)
       
-      downloadFile(response.url, `cover-letter-${company}-${position}.docx`)
+      downloadFile(response, `cover-letter-${company}-${position}.docx`)
       setToast({ type: 'success', message: 'DOCX başarıyla indirildi!' })
     } catch (error) {
       console.error('DOCX export error:', error)
@@ -477,13 +467,49 @@ export default function Home() {
         {/* Multiple Cover Letters Result */}
         {coverLetterBatch && (
           <div className="space-y-8">
+            {/* Analysis Dashboard for Batch */}
+            <div className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 p-8 shadow-2xl">
+              <h3 className="text-2xl font-bold text-white flex items-center mb-6">
+                <BarChart3 className="h-6 w-6 mr-3 text-blue-400" />
+                Analysis Dashboard
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                  <h4 className="text-lg font-semibold text-white mb-3">📊 Job Analysis</h4>
+                  <div className="space-y-2 text-blue-200">
+                    <p><strong>Company:</strong> {coverLetterBatch.analysis.company_name}</p>
+                    <p><strong>Position:</strong> {coverLetterBatch.analysis.position_title}</p>
+                    <p><strong>Experience:</strong> {coverLetterBatch.analysis.required_experience}</p>
+                  </div>
+                </div>
+                <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                  <h4 className="text-lg font-semibold text-white mb-3">🎯 Skill Matches</h4>
+                  <div className="space-y-2">
+                    {coverLetterBatch.skill_matches?.map((match, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <span className="text-blue-200">{match.skill}</span>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          match.matched 
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                        }`}>
+                          {match.matched ? '✓' : '✗'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cover Letter Variants */}
             {coverLetterBatch.letters.map((letter, index) => (
               <div key={index} className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 p-8 shadow-2xl">
                 <div className="flex items-center justify-between mb-6">
-                                     <h3 className="text-2xl font-bold text-white flex items-center">
-                     <Award className="h-6 w-6 mr-3 text-blue-400" />
-                     Variant {index + 1} - {coverLetterBatch.tone_used?.[index] || 'Formal'}
-                   </h3>
+                  <h3 className="text-2xl font-bold text-white flex items-center">
+                    <Award className="h-6 w-6 mr-3 text-blue-400" />
+                    Variant {index + 1} - {coverLetterBatch.tone_used?.[index] || 'Formal'}
+                  </h3>
                   <ExportButtons
                     onExportPdf={handleExportPdf}
                     onExportDocx={handleExportDocx}

@@ -27,7 +27,7 @@ class CoverLetterRequest(BaseModel):
 
 class ExportRequest(BaseModel):
     cover_letter: str = Field(..., description="Cover letter text content")
-    job_title: str = Field("Position", description="Job title")
+    position_title: str = Field("Position", description="Position title")
     company_name: str = Field("Company", description="Company name")
 
 class SkillMatch(BaseModel):
