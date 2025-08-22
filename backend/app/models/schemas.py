@@ -22,6 +22,7 @@ class CoverLetterRequest(BaseModel):
     cv_data: CVRequest
     tone: ToneType = Field(default=ToneType.FORMAL, description="Tone of the cover letter")
     custom_instructions: Optional[str] = Field(None, description="Custom instructions for generation")
+    variants: Optional[int] = Field(1, ge=1, le=5, description="Number of letter variants to generate")
 
 class SkillMatch(BaseModel):
     """Model for skill matching results"""
@@ -46,6 +47,15 @@ class CoverLetterResponse(BaseModel):
     missing_skills: List[str]
     recommendations: List[str]
     tone_used: ToneType
+
+class CoverLetterBatchResponse(BaseModel):
+    """Response model for multiple generated cover letters"""
+    letters: List[str]
+    analysis: JobAnalysis
+    skill_matches: List[SkillMatch]
+    missing_skills: List[str]
+    recommendations: List[str]
+    tones_used: List[ToneType]
 
 class HealthResponse(BaseModel):
     """Health check response"""

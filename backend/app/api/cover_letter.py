@@ -1,12 +1,22 @@
 from fastapi import APIRouter, HTTPException
-from app.models.schemas import CoverLetterRequest, CoverLetterResponse, JobAnalysis, SkillMatch, ToneType
+from app.models.schemas import (
+    CoverLetterRequest,
+    CoverLetterResponse,
+    JobAnalysis,
+    SkillMatch,
+    ToneType,
+    CoverLetterBatchResponse,
+)
 from app.services.spacy_service import SpaCyService
-from typing import List
+from app.services.ollama_service import OllamaAiService
+from app.settings import settings
+from typing import List, Union
 
 router = APIRouter()
 nlp_service = SpaCyService()
+ai_service = OllamaAiService()
 
-@router.post("/generate-cover-letter", response_model=CoverLetterResponse)
+@router.post("/generate-cover-letter", response_model=Union[CoverLetterResponse, CoverLetterBatchResponse])
 async def generate_cover_letter(request: CoverLetterRequest):
     """
     Generate a personalized cover letter based on job posting and CV
@@ -40,10 +50,26 @@ async def generate_cover_letter(request: CoverLetterRequest):
             key_requirements=key_requirements
         )
         
-        # Generate cover letter based on tone
-        cover_letter = generate_cover_letter(
-            job_info, cv_skills, skill_matches, request.tone
-        )
+        # Single or multi-variant generation
+        num_variants = max(1, int(request.variants or 1))
+        tones_cycle = ['formal', 'friendly', 'concise']
+        letters: List[str] = []
+        tones_used: List[str] = []
+        for i in range(num_variants):
+            tone_to_use = request.tone
+            if num_variants > 1:
+                tone_to_use = tones_cycle[i % len(tones_cycle)]
+            if settings.AI_PROVIDER == "ollama":
+                letter = await ai_service.draft_cover_letter(
+                    job_info=job_info,
+                    cv_skills=cv_skills,
+                    skill_matches=skill_matches,
+                    tone=tone_to_use,
+                )
+            else:
+                letter = generate_cover_letter(job_info, cv_skills, skill_matches, tone_to_use)
+            letters.append(letter)
+            tones_used.append(tone_to_use)
         
         # Convert skill matches to SkillMatch objects
         skill_match_objects = [
@@ -56,14 +82,24 @@ async def generate_cover_letter(request: CoverLetterRequest):
             for match in skill_matches
         ]
         
-        return CoverLetterResponse(
-            cover_letter=cover_letter,
-            analysis=analysis,
-            skill_matches=skill_match_objects,
-            missing_skills=missing_skills,
-            recommendations=recommendations,
-            tone_used=request.tone
-        )
+        if num_variants == 1:
+            return CoverLetterResponse(
+                cover_letter=letters[0],
+                analysis=analysis,
+                skill_matches=skill_match_objects,
+                missing_skills=missing_skills,
+                recommendations=recommendations,
+                tone_used=tones_used[0],
+            )
+        else:
+            return CoverLetterBatchResponse(
+                letters=letters,
+                analysis=analysis,
+                skill_matches=skill_match_objects,
+                missing_skills=missing_skills,
+                recommendations=recommendations,
+                tones_used=tones_used,
+            )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating cover letter: {str(e)}")
