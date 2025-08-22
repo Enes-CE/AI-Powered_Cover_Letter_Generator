@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import CoverLetterRequest, CoverLetterResponse, JobAnalysis, SkillMatch, ToneType
-from app.services.nlp_service import NLPService
+from app.services.spacy_service import SpaCyService
 from typing import List
 
 router = APIRouter()
-nlp_service = NLPService()
+nlp_service = SpaCyService()
 
 @router.post("/generate-cover-letter", response_model=CoverLetterResponse)
 async def generate_cover_letter(request: CoverLetterRequest):
@@ -71,7 +71,7 @@ async def generate_cover_letter(request: CoverLetterRequest):
 @router.get("/test")
 async def test_endpoint():
     """Test endpoint to verify API is working"""
-            return {"message": "Cover letter API is working!", "status": "success"}
+    return {"message": "Cover letter API is working!", "status": "success"}
 
 
 def generate_cover_letter(job_info: dict, cv_skills: List[str], skill_matches: List[dict], tone: str) -> str:
