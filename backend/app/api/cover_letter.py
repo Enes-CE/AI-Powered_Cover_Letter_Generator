@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from app.models.schemas import (
     CoverLetterRequest,
     CoverLetterResponse,
@@ -11,6 +12,14 @@ from app.services.spacy_service import SpaCyService
 from app.services.ollama_service import OllamaAiService
 from app.settings import settings
 from typing import List, Union
+import io
+import tempfile
+import os
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
 
 router = APIRouter()
 nlp_service = SpaCyService()
@@ -104,6 +113,106 @@ async def generate_cover_letter(request: CoverLetterRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating cover letter: {str(e)}")
 
+@router.post("/export-pdf")
+async def export_cover_letter_pdf(cover_letter: str, job_title: str = "Position", company_name: str = "Company"):
+    """Export cover letter as PDF"""
+    try:
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            # Create PDF document
+            doc = SimpleDocTemplate(tmp_file.name, pagesize=A4)
+            styles = getSampleStyleSheet()
+            
+            # Custom styles
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=16,
+                spaceAfter=30,
+                alignment=1  # Center alignment
+            )
+            
+            normal_style = ParagraphStyle(
+                'CustomNormal',
+                parent=styles['Normal'],
+                fontSize=11,
+                spaceAfter=12,
+                leading=14
+            )
+            
+            # Build PDF content
+            story = []
+            
+            # Title
+            story.append(Paragraph(f"Cover Letter - {job_title}", title_style))
+            story.append(Spacer(1, 20))
+            
+            # Company info
+            story.append(Paragraph(f"<b>Company:</b> {company_name}", normal_style))
+            story.append(Paragraph(f"<b>Position:</b> {job_title}", normal_style))
+            story.append(Spacer(1, 20))
+            
+            # Cover letter content
+            paragraphs = cover_letter.split('\n\n')
+            for para in paragraphs:
+                if para.strip():
+                    story.append(Paragraph(para.strip(), normal_style))
+                    story.append(Spacer(1, 12))
+            
+            # Build PDF
+            doc.build(story)
+            
+            # Return the file
+            return FileResponse(
+                tmp_file.name,
+                media_type='application/pdf',
+                filename=f'cover_letter_{company_name.replace(" ", "_")}_{job_title.replace(" ", "_")}.pdf'
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
+
+@router.post("/export-docx")
+async def export_cover_letter_docx(cover_letter: str, job_title: str = "Position", company_name: str = "Company"):
+    """Export cover letter as DOCX"""
+    try:
+        from docx import Document
+        from docx.shared import Inches
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        
+        # Create a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
+            # Create document
+            doc = Document()
+            
+            # Title
+            title = doc.add_heading(f'Cover Letter - {job_title}', 0)
+            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Company info
+            doc.add_paragraph(f'Company: {company_name}')
+            doc.add_paragraph(f'Position: {job_title}')
+            doc.add_paragraph('')  # Empty line
+            
+            # Cover letter content
+            paragraphs = cover_letter.split('\n\n')
+            for para in paragraphs:
+                if para.strip():
+                    doc.add_paragraph(para.strip())
+            
+            # Save document
+            doc.save(tmp_file.name)
+            
+            # Return the file
+            return FileResponse(
+                tmp_file.name,
+                media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                filename=f'cover_letter_{company_name.replace(" ", "_")}_{job_title.replace(" ", "_")}.docx'
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating DOCX: {str(e)}")
+
 @router.get("/test")
 async def test_endpoint():
     """Test endpoint to verify API is working"""
@@ -175,3 +284,23 @@ Best regards,
         """.strip()
     
     return cover_letter
+
+
+@router.post("/extract-cv-text")
+async def extract_cv_text(file: UploadFile = File(...)):
+    """Extract plain text from an uploaded PDF file."""
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    try:
+        from PyPDF2 import PdfReader
+        import io
+
+        content = await file.read()
+        reader = PdfReader(io.BytesIO(content))
+        pages_text = []
+        for page in reader.pages:
+            text = page.extract_text() or ""
+            pages_text.append(text)
+        return {"text": "\n".join(pages_text).strip()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse PDF: {str(e)}")

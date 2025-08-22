@@ -18,6 +18,9 @@ python-dotenv==1.0.0
 httpx==0.25.2
 requests==2.31.0
 
+# PDF parsing
+PyPDF2==3.0.1
+
 # JSON and data handling
 jsonschema==4.20.0
 

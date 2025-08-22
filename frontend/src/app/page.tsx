@@ -10,10 +10,22 @@ export default function Home() {
   const [tone, setTone] = useState<'formal' | 'friendly' | 'concise'>('formal')
   const [variants, setVariants] = useState(1)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [coverLetter, setCoverLetter] = useState<CoverLetterResponse | null>(null)
   const [coverLetterBatch, setCoverLetterBatch] = useState<CoverLetterBatchResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const { text } = await api.extractCvTextFromPdf(file)
+      setCvData(text)
+    } catch (err) {
+      setError('PDF okunamadı. Lütfen geçerli bir PDF yükleyin.')
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,6 +67,41 @@ export default function Home() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
+  }
+
+  const downloadFile = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  }
+
+  const handleExportPdf = async (letter: string, jobTitle: string, companyName: string) => {
+    setIsExporting(true)
+    try {
+      const blob = await api.exportPdf(letter, jobTitle, companyName)
+      downloadFile(blob, `cover_letter_${companyName.replace(/\s+/g, '_')}_${jobTitle.replace(/\s+/g, '_')}.pdf`)
+    } catch (err) {
+      setError('PDF export failed. Please try again.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleExportDocx = async (letter: string, jobTitle: string, companyName: string) => {
+    setIsExporting(true)
+    try {
+      const blob = await api.exportDocx(letter, jobTitle, companyName)
+      downloadFile(blob, `cover_letter_${companyName.replace(/\s+/g, '_')}_${jobTitle.replace(/\s+/g, '_')}.docx`)
+    } catch (err) {
+      setError('DOCX export failed. Please try again.')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   return (
@@ -116,6 +163,10 @@ export default function Home() {
                 className="input-field h-32 resize-none"
                 required
               />
+              <div className="mt-2">
+                <input type="file" accept="application/pdf" onChange={handlePdfUpload} />
+                <p className="text-xs text-gray-500 mt-1">PDF yükleyin; metin otomatik doldurulur.</p>
+              </div>
             </div>
 
             {/* Tone and Variants Selection */}
@@ -256,13 +307,29 @@ export default function Home() {
 
             {/* Export Buttons */}
             <div className="mt-6 flex gap-3">
-              <button className="btn-secondary flex items-center space-x-2">
+              <button 
+                onClick={() => handleExportPdf(
+                  coverLetter.cover_letter, 
+                  coverLetter.analysis.position_title || 'Position',
+                  coverLetter.analysis.company_name || 'Company'
+                )}
+                disabled={isExporting}
+                className="btn-secondary flex items-center space-x-2 disabled:opacity-50"
+              >
                 <Download className="h-4 w-4" />
-                <span>Download PDF</span>
+                <span>{isExporting ? 'Exporting...' : 'Download PDF'}</span>
               </button>
-              <button className="btn-secondary flex items-center space-x-2">
+              <button 
+                onClick={() => handleExportDocx(
+                  coverLetter.cover_letter, 
+                  coverLetter.analysis.position_title || 'Position',
+                  coverLetter.analysis.company_name || 'Company'
+                )}
+                disabled={isExporting}
+                className="btn-secondary flex items-center space-x-2 disabled:opacity-50"
+              >
                 <Download className="h-4 w-4" />
-                <span>Download DOCX</span>
+                <span>{isExporting ? 'Exporting...' : 'Download DOCX'}</span>
               </button>
             </div>
           </div>
@@ -290,6 +357,33 @@ export default function Home() {
                   <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans">
                     {letter}
                   </pre>
+                  {/* Export buttons for each variant */}
+                  <div className="mt-4 flex gap-2">
+                    <button 
+                      onClick={() => handleExportPdf(
+                        letter, 
+                        coverLetterBatch.analysis.position_title || 'Position',
+                        coverLetterBatch.analysis.company_name || 'Company'
+                      )}
+                      disabled={isExporting}
+                      className="btn-secondary flex items-center space-x-2 disabled:opacity-50 text-xs"
+                    >
+                      <Download className="h-3 w-3" />
+                      <span>{isExporting ? 'Exporting...' : 'PDF'}</span>
+                    </button>
+                    <button 
+                      onClick={() => handleExportDocx(
+                        letter, 
+                        coverLetterBatch.analysis.position_title || 'Position',
+                        coverLetterBatch.analysis.company_name || 'Company'
+                      )}
+                      disabled={isExporting}
+                      className="btn-secondary flex items-center space-x-2 disabled:opacity-50 text-xs"
+                    >
+                      <Download className="h-3 w-3" />
+                      <span>{isExporting ? 'Exporting...' : 'DOCX'}</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -327,18 +421,6 @@ export default function Home() {
                   ))}
                 </ul>
               </div>
-            </div>
-
-            {/* Export Buttons */}
-            <div className="mt-6 flex gap-3">
-              <button className="btn-secondary flex items-center space-x-2">
-                <Download className="h-4 w-4" />
-                <span>Download All PDF</span>
-              </button>
-              <button className="btn-secondary flex items-center space-x-2">
-                <Download className="h-4 w-4" />
-                <span>Download All DOCX</span>
-              </button>
             </div>
           </div>
         )}
