@@ -63,24 +63,89 @@ Summary:"""
     ) -> str | List[str]:
         company = job_info.get("company_name", "Company")
         title = job_info.get("position_title", "Role")
+        years_exp = job_info.get("years_of_experience", "")
+        achievements = job_info.get("key_achievements", "")
         matched = ", ".join([m["skill"] for m in skill_matches if m.get("matched")]) or "relevant skills"
         
-        base_prompt = f"""You are a professional cover letter writer. Write a {tone} cover letter for the position '{title}' at '{company}'.
+        # Detect language from job posting and CV
+        job_text = job_info.get("job_posting_text", "")
+        cv_text = job_info.get("cv_text", "")
+        
+        # Enhanced language detection
+        turkish_words = ["ve", "ile", "için", "bu", "bir", "da", "de", "gibi", "olarak", "üzerinde", "yazılım", "geliştirici", "deneyim", "konularında", "uzmanım", "arıyoruz", "gerekli", "şart"]
+        english_words = ["the", "and", "with", "for", "this", "a", "an", "in", "on", "at", "software", "developer", "experience", "skills", "required", "looking", "need"]
+        
+        turkish_count = sum(1 for word in turkish_words if word in job_text.lower() or word in cv_text.lower())
+        english_count = sum(1 for word in english_words if word in job_text.lower() or word in cv_text.lower())
+        
+        is_turkish = turkish_count > english_count
+        
+        if is_turkish:
+            base_prompt = f"""Sen profesyonel bir ön yazı yazarısın. '{company}' şirketindeki '{title}' pozisyonu için {tone} bir ön yazı yaz.
+
+İŞ İLANI:
+{job_info.get('job_posting_text', '')}
+
+CV BİLGİLERİ:
+{job_info.get('cv_text', '')}
+
+Temel gereksinimler:
+- Ton: {tone}
+- Pozisyon: {title}
+- Şirket: {company}
+- Bu eşleşen yetenekleri vurgula: {matched}
+- Uzunluk: Maksimum 250 kelime
+- Yapı: Profesyonel selamlama, 2-3 paragraf, profesyonel kapanış
+
+Dahil edilecek ek bağlam:
+{f"- Deneyim yılı: {years_exp}" if years_exp else ""}
+{f"- Ana başarılar: {achievements}" if achievements else ""}
+
+Yönergeler:
+- İş ilanındaki spesifik gereksinimlere odaklan
+- CV'deki gerçek deneyimleri ve başarıları kullan
+- Role olan heyecanını gösteren güçlü bir açılışla başla
+- Yeteneklerini ve deneyimini iş gereksinimleriyle bağla
+- Şirket ve rol hakkında anlayış göster
+- Verilen başarıları ve deneyimi detaylı şekilde dahil et
+- Mülakat için bir çağrı ile bitir
+- Profesyonel ama etkileyici dil kullan
+- Her seferinde farklı bir yaklaşım kullan
+- Kişisel ve özgün ol
+
+Ön Yazı:"""
+        else:
+            base_prompt = f"""You are a professional cover letter writer. Write a {tone} cover letter for the position '{title}' at '{company}'.
+
+JOB POSTING:
+{job_info.get('job_posting_text', '')}
+
+CV INFORMATION:
+{job_info.get('cv_text', '')}
 
 Key requirements:
 - Tone: {tone}
 - Position: {title}
 - Company: {company}
 - Highlight these matched skills: {matched}
-- Length: Maximum 220 words
+- Length: Maximum 250 words
 - Structure: Professional greeting, 2-3 paragraphs, professional closing
 
+Additional context to include:
+{f"- Years of experience: {years_exp}" if years_exp else ""}
+{f"- Key achievements: {achievements}" if achievements else ""}
+
 Guidelines:
+- Focus on specific requirements from the job posting
+- Use real experiences and achievements from the CV
 - Start with a strong opening that shows enthusiasm for the role
 - Connect your skills and experience to the job requirements
 - Show understanding of the company and role
+- Include provided achievements and experience in detail
 - End with a call to action for an interview
 - Use professional but engaging language
+- Use a different approach each time
+- Be personal and unique
 
 Cover Letter:"""
         
@@ -90,13 +155,23 @@ Cover Letter:"""
         if variants == 1:
             return await self._generate(base_prompt, temperature=0.6, max_tokens=700)
         else:
-            # Generate multiple variants with different temperatures
+            # Generate multiple variants with different approaches
             results = []
-            temperatures = [0.6, 0.7, 0.8, 0.9, 1.0]
-            for i in range(min(variants, len(temperatures))):
-                variant_prompt = f"{base_prompt}\n\nVariant {i+1}:"
-                result = await self._generate(variant_prompt, temperature=temperatures[i], max_tokens=700)
+            
+            # Different temperature and prompt variations for more diverse results
+            variations = [
+                {"temp": 0.7, "suffix": "Lütfen başarıları ve somut sonuçları vurgula." if is_turkish else "Please emphasize achievements and concrete results."},
+                {"temp": 0.8, "suffix": "Lütfen şirket değerleri ve kültürüne odaklan." if is_turkish else "Please focus on company values and culture."},
+                {"temp": 0.9, "suffix": "Lütfen yaratıcı bir açılış ve benzersiz bir yaklaşım kullan." if is_turkish else "Please use a creative opening and unique approach."},
+                {"temp": 0.75, "suffix": "Lütfen teknik yetenekleri ve problem çözme becerilerini öne çıkar." if is_turkish else "Please highlight technical skills and problem-solving abilities."},
+                {"temp": 0.85, "suffix": "Lütfen liderlik deneyimi ve takım çalışmasını vurgula." if is_turkish else "Please emphasize leadership experience and teamwork."}
+            ]
+            
+            for i in range(min(variants, len(variations))):
+                variant_prompt = f"{base_prompt}\n\n{variations[i]['suffix']}"
+                result = await self._generate(variant_prompt, temperature=variations[i]['temp'], max_tokens=700)
                 results.append(result)
+            
             return results
 
 

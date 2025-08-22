@@ -24,7 +24,16 @@ from reportlab.lib import colors
 
 router = APIRouter()
 nlp_service = SpaCyService()
-ai_service = OllamaAiService()
+
+# Initialize AI service based on provider
+if settings.AI_PROVIDER == "ollama":
+    ai_service = OllamaAiService()
+elif settings.AI_PROVIDER == "transformers":
+    # TransformersService removed - using Ollama as fallback
+    print("⚠️ Transformers provider not available, using Ollama instead")
+    ai_service = OllamaAiService()
+else:
+    ai_service = None  # For template mode
 
 @router.post("/generate-cover-letter", response_model=Union[CoverLetterResponse, CoverLetterBatchResponse])
 async def generate_cover_letter(request: CoverLetterRequest):
@@ -51,12 +60,16 @@ async def generate_cover_letter(request: CoverLetterRequest):
         # Generate recommendations
         recommendations = nlp_service.generate_recommendations(skill_matches, missing_skills)
         
+        # Use provided company name and position title if available
+        final_company_name = request.company_name or job_info.get('company_name', 'Tech Company')
+        final_position_title = request.position_title or job_info.get('position_title', 'Software Engineer')
+        
         # Create analysis
         analysis = JobAnalysis(
             extracted_skills=job_skills,
             required_experience=job_info.get('required_experience', '3+ years'),
-            company_name=job_info.get('company_name', 'Tech Company'),
-            position_title=job_info.get('position_title', 'Software Engineer'),
+            company_name=final_company_name,
+            position_title=final_position_title,
             key_requirements=key_requirements
         )
         
@@ -69,15 +82,26 @@ async def generate_cover_letter(request: CoverLetterRequest):
             tone_to_use = request.tone
             if num_variants > 1:
                 tone_to_use = tones_cycle[i % len(tones_cycle)]
-            if settings.AI_PROVIDER == "ollama":
+            # Create enhanced job info with user-provided details
+            enhanced_job_info = {
+                **job_info,
+                'company_name': final_company_name,
+                'position_title': final_position_title,
+                'years_of_experience': request.years_of_experience,
+                'key_achievements': request.key_achievements,
+                'job_posting_text': request.job_posting.job_posting_text,
+                'cv_text': request.cv_data.cv_text
+            }
+            
+            if settings.AI_PROVIDER in ["ollama", "transformers"] and ai_service:
                 letter = await ai_service.draft_cover_letter(
-                    job_info=job_info,
+                    job_info=enhanced_job_info,
                     cv_skills=cv_skills,
                     skill_matches=skill_matches,
                     tone=tone_to_use,
                 )
             else:
-                letter = generate_cover_letter(job_info, cv_skills, skill_matches, tone_to_use)
+                letter = generate_template_cover_letter(enhanced_job_info, cv_skills, skill_matches, tone_to_use)
             letters.append(letter)
             tones_used.append(tone_to_use)
         
@@ -112,6 +136,10 @@ async def generate_cover_letter(request: CoverLetterRequest):
             )
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error generating cover letter: {str(e)}")
+        print(f"Traceback: {error_details}")
         raise HTTPException(status_code=500, detail=f"Error generating cover letter: {str(e)}")
 
 @router.post("/export-pdf")
@@ -220,7 +248,7 @@ async def test_endpoint():
     return {"message": "Cover letter API is working!", "status": "success"}
 
 
-def generate_cover_letter(job_info: dict, cv_skills: List[str], skill_matches: List[dict], tone: str) -> str:
+def generate_template_cover_letter(job_info: dict, cv_skills: List[str], skill_matches: List[dict], tone: str) -> str:
     """Generate cover letter based on job info, CV skills, and tone"""
     
     position_title = job_info.get('position_title', 'Software Engineer')
@@ -230,9 +258,77 @@ def generate_cover_letter(job_info: dict, cv_skills: List[str], skill_matches: L
     matched_skills = [match['skill'] for match in skill_matches if match['matched']]
     top_skills = matched_skills[:3] if matched_skills else ['software development']
     
-    # Generate based on tone
-    if tone == "formal":
-        cover_letter = f"""
+    # Detect language from job posting and CV
+    job_text = job_info.get('job_posting_text', '')
+    cv_text = job_info.get('cv_text', '')
+    
+    # Enhanced language detection
+    turkish_words = ["ve", "ile", "için", "bu", "bir", "da", "de", "gibi", "olarak", "üzerinde", "yazılım", "geliştirici", "deneyim", "konularında", "uzmanım", "arıyoruz", "gerekli", "şart"]
+    english_words = ["the", "and", "with", "for", "this", "a", "an", "in", "on", "at", "software", "developer", "experience", "skills", "required", "looking", "need"]
+    
+    turkish_count = sum(1 for word in turkish_words if word in job_text.lower() or word in cv_text.lower())
+    english_count = sum(1 for word in english_words if word in job_text.lower() or word in cv_text.lower())
+    
+    is_turkish = turkish_count > english_count
+    
+    # Generate based on tone and language
+    if is_turkish:
+        if tone == "formal":
+            cover_letter = f"""
+Sayın İnsan Kaynakları Yöneticisi,
+
+{company_name} şirketindeki {position_title} pozisyonu için başvuruda bulunmaktan heyecan duyuyorum. Yazılım geliştirme alanındaki deneyimim ve {', '.join(top_skills)} konularındaki uzmanlığımla ekibinize değerli katkılar sağlayabileceğimi düşünüyorum.
+
+Deneyimlerim şunları içerir:
+- {len(cv_skills)} teknik yetenek, {', '.join(top_skills)} dahil
+- Güçlü problem çözme ve analitik yetenekler
+- Modern geliştirme pratikleri deneyimi
+- İşbirlikçi takım ortamı deneyimi
+
+Yenilikçi projelerinize katkıda bulunma ve ekibinizle birlikte büyüme fırsatı için heyecan duyuyorum.
+
+Saygılarımla,
+[Adınız]
+            """.strip()
+        
+        elif tone == "friendly":
+            cover_letter = f"""
+Merhaba!
+
+{company_name}'deki {position_title} fırsatı için gerçekten heyecanlıyım! {', '.join(top_skills)} alanındaki deneyimimin ekibiniz için mükemmel bir uyum olacağını düşünüyorum.
+
+Size sunabileceklerim:
+- {', '.join(top_skills)} konusunda sağlam deneyim
+- Yeni teknolojiler öğrenme tutkusu
+- Mükemmel takım çalışması ve iletişim becerileri
+- Kaliteli sonuçlar sunma geçmişi
+
+Ekibinizin başarısına nasıl katkıda bulunabileceğim hakkında konuşmayı çok isterim!
+
+Saygılarımla,
+[Adınız]
+            """.strip()
+        
+        else:  # concise
+            cover_letter = f"""
+Sayın İnsan Kaynakları Yöneticisi,
+
+{company_name}'deki {position_title} pozisyonu ile ilgileniyorum.
+
+Temel nitelikler:
+- {len(cv_skills)} teknik yetenek
+- {', '.join(top_skills)} deneyimi
+- Güçlü geliştirme geçmişi
+
+Hemen başlayabilirim.
+
+Saygılarımla,
+[Adınız]
+            """.strip()
+    else:
+        # English templates (original)
+        if tone == "formal":
+            cover_letter = f"""
 Dear Hiring Manager,
 
 I am writing to express my strong interest in the {position_title} position at {company_name}. With my background in software development and experience with {', '.join(top_skills)}, I believe I would be a valuable addition to your team.
@@ -247,10 +343,10 @@ I am excited about the opportunity to contribute to your innovative projects and
 
 Best regards,
 [Your Name]
-        """.strip()
-    
-    elif tone == "friendly":
-        cover_letter = f"""
+            """.strip()
+        
+        elif tone == "friendly":
+            cover_letter = f"""
 Hi there!
 
 I'm really excited about the {position_title} opportunity at {company_name}! I think my background in {', '.join(top_skills)} would be a great fit for your team.
@@ -265,10 +361,10 @@ I'd love to chat about how I can contribute to your team's success!
 
 Best,
 [Your Name]
-        """.strip()
-    
-    else:  # concise
-        cover_letter = f"""
+            """.strip()
+        
+        else:  # concise
+            cover_letter = f"""
 Dear Hiring Manager,
 
 I'm interested in the {position_title} position at {company_name}.
@@ -282,7 +378,7 @@ Available for immediate start.
 
 Best regards,
 [Your Name]
-        """.strip()
+            """.strip()
     
     return cover_letter
 

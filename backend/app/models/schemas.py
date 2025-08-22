@@ -17,6 +17,10 @@ class CVRequest(BaseModel):
 class CoverLetterRequest(BaseModel):
     job_posting: JobPostingRequest
     cv_data: CVRequest
+    company_name: Optional[str] = Field(None, description="Company name for the cover letter")
+    position_title: Optional[str] = Field(None, description="Position title for the cover letter")
+    years_of_experience: Optional[str] = Field(None, description="Years of experience")
+    key_achievements: Optional[str] = Field(None, description="Key achievements and accomplishments")
     tone: ToneType = Field(..., description="Writing tone for the cover letter")
     custom_instructions: Optional[str] = Field(None, description="Custom instructions for generation")
     variants: Optional[int] = Field(1, ge=1, description="Number of cover letter variants to generate")

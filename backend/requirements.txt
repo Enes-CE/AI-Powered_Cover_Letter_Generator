@@ -21,6 +21,11 @@ requests==2.31.0
 # PDF parsing
 PyPDF2==3.0.1
 
+# Transformers and PyTorch - REMOVED (using Ollama instead)
+# transformers==4.36.0
+# torch==2.2.0
+# accelerate==0.25.0
+
 # JSON and data handling
 jsonschema==4.20.0
 

@@ -79,39 +79,102 @@ class SpaCyService:
     def extract_skills_from_text(self, text: str) -> List[str]:
         if not text:
             return []
-        doc = self.nlp(text)
-        candidates: List[str] = []
-
-        # 1) Proper noun chunks and nouns
-        for token in doc:
-            if token.is_stop:
-                continue
-            if token.lemma_.lower() in self.extra_stop_terms:
-                continue
-            if token.pos_ in {"PROPN", "NOUN"} and len(token.text) > 2:
-                candidates.append(token.text.lower())
-
-        # 2) Noun chunks (multi-word terms)
-        for chunk in doc.noun_chunks:
-            phrase = chunk.text.strip().lower()
-            if len(phrase) > 2 and not all(w.isdigit() for w in phrase.split()):
-                candidates.append(phrase)
-
-        # 3) Gazetteer lookup in raw text for common tech skills
+        
         text_lower = text.lower()
+        skills_found = []
+        
+        # 1) First priority: Look for known technical skills in the text
         for skill in self.technical_skills:
             if skill in text_lower:
-                candidates.append(skill)
-
-        # Normalize and deduplicate
-        normalized: List[str] = []
-        seen = set()
-        for c in candidates:
-            c = re.sub(r"\s+", " ", c).strip()
-            if c and c not in seen:
-                seen.add(c)
-                normalized.append(c)
-        return normalized
+                skills_found.append(skill)
+        
+        # 2) Look for skill patterns like "experience with X", "knowledge of Y", "proficient in Z"
+        skill_patterns = [
+            r"experience\s+(?:with|in)\s+([a-zA-Z0-9\s\+\#\.]+?)(?:\s|\.|,|$)",
+            r"knowledge\s+(?:of|in)\s+([a-zA-Z0-9\s\+\#\.]+?)(?:\s|\.|,|$)",
+            r"proficient\s+(?:with|in)\s+([a-zA-Z0-9\s\+\#\.]+?)(?:\s|\.|,|$)",
+            r"skilled\s+(?:with|in)\s+([a-zA-Z0-9\s\+\#\.]+?)(?:\s|\.|,|$)",
+            r"expertise\s+(?:with|in)\s+([a-zA-Z0-9\s\+\#\.]+?)(?:\s|\.|,|$)",
+            r"familiar\s+(?:with|in)\s+([a-zA-Z0-9\s\+\#\.]+?)(?:\s|\.|,|$)",
+        ]
+        
+        for pattern in skill_patterns:
+            matches = re.findall(pattern, text_lower)
+            for match in matches:
+                skill = match.strip()
+                if len(skill) > 2 and skill not in skills_found:
+                    skills_found.append(skill)
+        
+        # 3) Look for capitalized terms that might be technologies (e.g., React, Python, AWS)
+        doc = self.nlp(text)
+        for token in doc:
+            if (token.is_title or token.is_upper) and len(token.text) > 2:
+                skill = token.text.lower()
+                # Only add if it looks like a real technology
+                if (skill not in skills_found and 
+                    skill not in self.extra_stop_terms):
+                    skills_found.append(skill)
+        
+        # 4) Look for multi-word technical terms (e.g., "machine learning", "deep learning")
+        text_lower = text.lower()
+        multi_word_skills = [
+            "machine learning", "deep learning", "artificial intelligence", "data science",
+            "web development", "mobile development", "cloud computing", "devops",
+            "software engineering", "full stack", "front end", "back end",
+            "user experience", "user interface", "database management", "api development"
+        ]
+        
+        for skill in multi_word_skills:
+            if skill in text_lower and skill not in skills_found:
+                skills_found.append(skill)
+        
+        # 5) Filter out common non-skill words and clean up skills
+        filtered_skills = []
+        non_skill_words = {
+            # English non-skill words
+            "experience", "years", "required", "preferred", "skills", "knowledge", 
+            "ability", "responsibilities", "duties", "qualifications", "requirements",
+            "team", "work", "project", "development", "software", "application",
+            "system", "technology", "platform", "framework", "library", "tool",
+            "methodology", "process", "approach", "strategy", "solution", "service",
+            "needed", "engineer", "scientist", "developer", "analyst", "manager",
+            "machine", "learning", "deep", "data", "analysis", "neural", "networks",
+            
+            # Turkish non-skill words
+            "görev", "tanımı", "şirketin", "için", "ile", "ve", "bu", "bir", "da", "de",
+            "gibi", "olarak", "üzerinde", "yazılım", "geliştirici", "deneyim", 
+            "konularında", "uzmanım", "arıyoruz", "gerekli", "şart", "yıl", "yıllık",
+            "pozisyon", "rol", "sorumluluk", "nitelik", "beceri", "yetenek", "bilgi",
+            "uygulama", "sistem", "teknoloji", "platform", "çerçeve", "kütüphane",
+            "araç", "metodoloji", "süreç", "yaklaşım", "strateji", "çözüm", "hizmet",
+            "mühendis", "geliştirici", "analist", "yönetici", "makine", "öğrenme",
+            "derin", "veri", "analiz", "sinir", "ağları", "deneyim", "yıllar",
+            "gerekli", "tercih", "yetenekler", "bilgi", "sorumluluk", "görevler",
+            "nitelikler", "gereksinimler", "takım", "iş", "proje", "geliştirme"
+        }
+        
+        for skill in skills_found:
+            # Clean up the skill
+            skill = skill.strip().lower()
+            # Remove trailing punctuation and common words
+            skill = re.sub(r'[.,;!?]+$', '', skill)
+            skill = re.sub(r'\s+(required|needed|preferred|experience|years?)\s*$', '', skill)
+            
+            # Additional validation for real skills
+            is_real_skill = (
+                skill not in non_skill_words and 
+                len(skill) > 2 and 
+                len(skill.split()) <= 3 and  # Max 3 words per skill
+                not skill.endswith('.') and
+                not skill.isdigit() and  # Not just numbers
+                not any(char.isdigit() for char in skill) and  # No numbers in skill names
+                skill not in ['ve', 'ile', 'için', 'bu', 'bir', 'da', 'de', 'gibi', 'olarak']
+            )
+            
+            if is_real_skill:
+                filtered_skills.append(skill)
+        
+        return filtered_skills[:10]  # Return top 10 most relevant skills
 
     def extract_job_info(self, text: str) -> Dict[str, str]:
         if not text:
@@ -170,17 +233,44 @@ class SpaCyService:
     def match_skills(self, job_skills: List[str], cv_skills: List[str]) -> List[Dict]:
         cv_set = {s.lower() for s in cv_skills}
         matches: List[Dict] = []
+        
         for js in job_skills:
             j = js.lower()
-            matched = j in cv_set or any(j in s or s in j for s in cv_set)
-            confidence = 1.0 if j in cv_set else (0.7 if matched else 0.0)
-            evidence = "Direct match" if j in cv_set else ("Partial match" if matched else "")
-            matches.append({
-                "skill": js,
-                "matched": matched,
-                "confidence": confidence,
-                "cv_evidence": evidence,
-            })
+            
+            # Check for exact match first
+            if j in cv_set:
+                matches.append({
+                    "skill": js,
+                    "matched": True,
+                    "confidence": 1.0,
+                    "cv_evidence": "Exact match found in CV",
+                })
+                continue
+            
+            # Check for partial matches (e.g., "python" matches "python 3.9")
+            partial_match = False
+            best_match = ""
+            for cv_skill in cv_set:
+                if j in cv_skill or cv_skill in j:
+                    partial_match = True
+                    best_match = cv_skill
+                    break
+            
+            if partial_match:
+                matches.append({
+                    "skill": js,
+                    "matched": True,
+                    "confidence": 0.8,
+                    "cv_evidence": f"Partial match: {best_match}",
+                })
+            else:
+                matches.append({
+                    "skill": js,
+                    "matched": False,
+                    "confidence": 0.0,
+                    "cv_evidence": "Not found in CV",
+                })
+        
         return matches
 
     def find_missing_skills(self, job_skills: List[str], cv_skills: List[str]) -> List[str]:
