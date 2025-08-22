@@ -2,8 +2,6 @@
 
 <div align="center">
 
-![AI Cover Letter Generator](https://via.placeholder.com/800x400/1e40af/ffffff?text=AI+Cover+Letter+Generator)
-
 **Modern, AI-driven cover letter generator with beautiful UI and advanced NLP capabilities**
 
 [![Next.js](https://img.shields.io/badge/Next.js-14.0.4-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
@@ -390,12 +388,6 @@ We welcome contributions! Please follow these steps:
 
 ---
 
-## 📄 License
-
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 🙏 Acknowledgments
 
 - **[Ollama](https://ollama.ai)** - For providing local LLM capabilities
@@ -410,7 +402,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 - **GitHub Issues**: [Report a bug](https://github.com/Enes-CE/AI-Powered_Cover_Letter_Generator/issues)
 - **Discussions**: [Join the conversation](https://github.com/Enes-CE/AI-Powered_Cover_Letter_Generator/discussions)
-- **Email**: [Contact us](mailto:your-email@example.com)
+- **Email**: [Contact us](mailto:c.enes.eng@gmail.com)
 
 ---
 
