@@ -7,6 +7,7 @@ from app.models.schemas import (
     SkillMatch,
     ToneType,
     CoverLetterBatchResponse,
+    ExportRequest,
 )
 from app.services.spacy_service import SpaCyService
 from app.services.ollama_service import OllamaAiService
@@ -107,14 +108,14 @@ async def generate_cover_letter(request: CoverLetterRequest):
                 skill_matches=skill_match_objects,
                 missing_skills=missing_skills,
                 recommendations=recommendations,
-                tones_used=tones_used,
+                tone_used=tones_used,
             )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating cover letter: {str(e)}")
 
 @router.post("/export-pdf")
-async def export_cover_letter_pdf(cover_letter: str, job_title: str = "Position", company_name: str = "Company"):
+async def export_cover_letter_pdf(request: ExportRequest):
     """Export cover letter as PDF"""
     try:
         # Create a temporary file
@@ -144,16 +145,16 @@ async def export_cover_letter_pdf(cover_letter: str, job_title: str = "Position"
             story = []
             
             # Title
-            story.append(Paragraph(f"Cover Letter - {job_title}", title_style))
+            story.append(Paragraph(f"Cover Letter - {request.job_title}", title_style))
             story.append(Spacer(1, 20))
             
             # Company info
-            story.append(Paragraph(f"<b>Company:</b> {company_name}", normal_style))
-            story.append(Paragraph(f"<b>Position:</b> {job_title}", normal_style))
+            story.append(Paragraph(f"<b>Company:</b> {request.company_name}", normal_style))
+            story.append(Paragraph(f"<b>Position:</b> {request.job_title}", normal_style))
             story.append(Spacer(1, 20))
             
             # Cover letter content
-            paragraphs = cover_letter.split('\n\n')
+            paragraphs = request.cover_letter.split('\n\n')
             for para in paragraphs:
                 if para.strip():
                     story.append(Paragraph(para.strip(), normal_style))
@@ -166,14 +167,14 @@ async def export_cover_letter_pdf(cover_letter: str, job_title: str = "Position"
             return FileResponse(
                 tmp_file.name,
                 media_type='application/pdf',
-                filename=f'cover_letter_{company_name.replace(" ", "_")}_{job_title.replace(" ", "_")}.pdf'
+                filename=f'cover_letter_{request.company_name.replace(" ", "_")}_{request.job_title.replace(" ", "_")}.pdf'
             )
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
 
 @router.post("/export-docx")
-async def export_cover_letter_docx(cover_letter: str, job_title: str = "Position", company_name: str = "Company"):
+async def export_cover_letter_docx(request: ExportRequest):
     """Export cover letter as DOCX"""
     try:
         from docx import Document
@@ -186,16 +187,16 @@ async def export_cover_letter_docx(cover_letter: str, job_title: str = "Position
             doc = Document()
             
             # Title
-            title = doc.add_heading(f'Cover Letter - {job_title}', 0)
+            title = doc.add_heading(f'Cover Letter - {request.job_title}', 0)
             title.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
             # Company info
-            doc.add_paragraph(f'Company: {company_name}')
-            doc.add_paragraph(f'Position: {job_title}')
+            doc.add_paragraph(f'Company: {request.company_name}')
+            doc.add_paragraph(f'Position: {request.job_title}')
             doc.add_paragraph('')  # Empty line
             
             # Cover letter content
-            paragraphs = cover_letter.split('\n\n')
+            paragraphs = request.cover_letter.split('\n\n')
             for para in paragraphs:
                 if para.strip():
                     doc.add_paragraph(para.strip())
@@ -207,7 +208,7 @@ async def export_cover_letter_docx(cover_letter: str, job_title: str = "Position
             return FileResponse(
                 tmp_file.name,
                 media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                filename=f'cover_letter_{company_name.replace(" ", "_")}_{job_title.replace(" ", "_")}.docx'
+                filename=f'cover_letter_{request.company_name.replace(" ", "_")}_{request.job_title.replace(" ", "_")}.docx'
             )
             
     except Exception as e:
@@ -291,16 +292,50 @@ async def extract_cv_text(file: UploadFile = File(...)):
     """Extract plain text from an uploaded PDF file."""
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
     try:
         from PyPDF2 import PdfReader
         import io
 
         content = await file.read()
-        reader = PdfReader(io.BytesIO(content))
+        
+        # Check if file is empty
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="PDF file is empty")
+        
+        # Try to read the PDF
+        try:
+            reader = PdfReader(io.BytesIO(content))
+        except Exception as pdf_error:
+            raise HTTPException(status_code=400, detail=f"Invalid PDF format: {str(pdf_error)}")
+        
+        # Check if PDF has pages
+        if len(reader.pages) == 0:
+            raise HTTPException(status_code=400, detail="PDF has no readable pages")
+        
         pages_text = []
-        for page in reader.pages:
-            text = page.extract_text() or ""
-            pages_text.append(text)
-        return {"text": "\n".join(pages_text).strip()}
+        for i, page in enumerate(reader.pages):
+            try:
+                text = page.extract_text() or ""
+                if text.strip():  # Only add non-empty text
+                    pages_text.append(text)
+            except Exception as page_error:
+                # Skip problematic pages but continue with others
+                continue
+        
+        if not pages_text:
+            raise HTTPException(status_code=400, detail="No text could be extracted from PDF. The PDF might be image-based or corrupted.")
+        
+        extracted_text = "\n".join(pages_text).strip()
+        
+        # Check if we got meaningful text
+        if len(extracted_text) < 10:
+            raise HTTPException(status_code=400, detail="Extracted text is too short. The PDF might be image-based.")
+        
+        return {"text": extracted_text}
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse PDF: {str(e)}")

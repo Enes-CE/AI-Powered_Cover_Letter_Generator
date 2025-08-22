@@ -19,11 +19,34 @@ export default function Home() {
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    
+    // Check file type
+    if (file.type !== 'application/pdf') {
+      setError('Lütfen sadece PDF dosyası yükleyin.')
+      return
+    }
+    
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('PDF dosyası çok büyük. Maksimum 10MB olmalı.')
+      return
+    }
+    
     try {
+      setError(null) // Clear previous errors
       const { text } = await api.extractCvTextFromPdf(file)
-      setCvData(text)
+      
+      if (text && text.trim().length > 0) {
+        setCvData(text)
+      } else {
+        setError('PDF\'den metin çıkarılamadı. Dosya görsel tabanlı olabilir.')
+      }
     } catch (err) {
-      setError('PDF okunamadı. Lütfen geçerli bir PDF yükleyin.')
+      if (err instanceof APIError) {
+        setError(`PDF Hatası: ${err.message}`)
+      } else {
+        setError('PDF okunamadı. Lütfen geçerli bir PDF yükleyin.')
+      }
     }
   }
 

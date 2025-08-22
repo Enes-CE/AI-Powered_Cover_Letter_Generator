@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Union
 from enum import Enum
 
 class ToneType(str, Enum):
@@ -8,39 +8,38 @@ class ToneType(str, Enum):
     CONCISE = "concise"
 
 class JobPostingRequest(BaseModel):
-    """Request model for job posting analysis"""
-    job_posting_text: str = Field(..., description="The job posting text to analyze")
-    
+    job_posting_text: str = Field(..., description="Job posting text content")
+
 class CVRequest(BaseModel):
-    """Request model for CV/resume data"""
-    cv_text: Optional[str] = Field(None, description="CV text in markdown or plain text")
-    cv_json: Optional[Dict[str, Any]] = Field(None, description="CV data in JSON format")
-    
+    cv_text: Optional[str] = Field(None, description="CV text content")
+    cv_json: Optional[dict] = Field(None, description="CV data in JSON format")
+
 class CoverLetterRequest(BaseModel):
-    """Request model for cover letter generation"""
     job_posting: JobPostingRequest
     cv_data: CVRequest
-    tone: ToneType = Field(default=ToneType.FORMAL, description="Tone of the cover letter")
+    tone: ToneType = Field(..., description="Writing tone for the cover letter")
     custom_instructions: Optional[str] = Field(None, description="Custom instructions for generation")
-    variants: Optional[int] = Field(1, ge=1, le=5, description="Number of letter variants to generate")
+    variants: Optional[int] = Field(1, ge=1, description="Number of cover letter variants to generate")
+
+class ExportRequest(BaseModel):
+    cover_letter: str = Field(..., description="Cover letter text content")
+    job_title: str = Field("Position", description="Job title")
+    company_name: str = Field("Company", description="Company name")
 
 class SkillMatch(BaseModel):
-    """Model for skill matching results"""
     skill: str
     matched: bool
     confidence: float
     cv_evidence: Optional[str] = None
 
 class JobAnalysis(BaseModel):
-    """Model for job posting analysis results"""
     extracted_skills: List[str]
     required_experience: Optional[str] = None
     company_name: Optional[str] = None
     position_title: Optional[str] = None
-    key_requirements: List[str]
+    key_requirements: List[str] = []
 
 class CoverLetterResponse(BaseModel):
-    """Response model for generated cover letter"""
     cover_letter: str
     analysis: JobAnalysis
     skill_matches: List[SkillMatch]
@@ -49,13 +48,12 @@ class CoverLetterResponse(BaseModel):
     tone_used: ToneType
 
 class CoverLetterBatchResponse(BaseModel):
-    """Response model for multiple generated cover letters"""
     letters: List[str]
     analysis: JobAnalysis
     skill_matches: List[SkillMatch]
     missing_skills: List[str]
     recommendations: List[str]
-    tones_used: List[ToneType]
+    tone_used: Union[ToneType, List[ToneType]]
 
 class HealthResponse(BaseModel):
     """Health check response"""
