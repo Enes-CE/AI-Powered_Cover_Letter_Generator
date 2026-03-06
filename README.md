@@ -2,7 +2,9 @@
 
 <div align="center">
 
-**Modern, AI-driven cover letter generator with beautiful UI and advanced NLP capabilities**
+**Upload your CV. Paste the job description. Get a tailored, interview-ready cover letter in seconds.**
+
+> Tired of sending the same generic cover letter to every job? This tool analyzes your CV against each specific job posting, identifies skill matches and gaps, then generates a personalized cover letter — in your tone, in your language.
 
 [![Next.js](https://img.shields.io/badge/Next.js-14.0.4-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -10,7 +12,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Ollama](https://img.shields.io/badge/Ollama-Llama%203.1%208B-orange?style=for-the-badge)](https://ollama.ai/)
 
-[Demo](#-demo) • [Features](#-features) • [Tech Stack](#-tech-stack) • [Installation](#-installation) • [Usage](#-usage) • [API](#-api) • [Contributing](#-contributing)
+[Demo](#-demo) • [Features](#-features) • [Tech Stack](#-tech-stack) • [Installation](#-installation) • [Usage](#-usage) • [API](#-api)
 
 </div>
 
@@ -369,49 +371,19 @@ curl -X POST http://localhost:8003/api/generate-cover-letter \
 
 ---
 
-## 🤝 Contributing
+## 💼 Need Something Similar Built?
 
-We welcome contributions! Please follow these steps:
+I build custom AI-powered tools and ML solutions for businesses — from predictive models and NLP pipelines to full-stack AI applications like this one.
 
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
-### **Development Guidelines**
-- Follow TypeScript best practices
-- Use meaningful commit messages
-- Add tests for new features
-- Update documentation as needed
-- Follow the existing code style
-
----
-
-## 🙏 Acknowledgments
-
-- **[Ollama](https://ollama.ai)** - For providing local LLM capabilities
-- **[SpaCy](https://spacy.io)** - For industrial-strength NLP processing
-- **[Next.js](https://nextjs.org)** - For the amazing React framework
-- **[FastAPI](https://fastapi.tiangolo.com)** - For the modern Python web framework
-- **[Tailwind CSS](https://tailwindcss.com)** - For the utility-first CSS framework
-
----
-
-## 📞 Support & Contact
-
-- **GitHub Issues**: [Report a bug](https://github.com/Enes-CE/AI-Powered_Cover_Letter_Generator/issues)
-- **Discussions**: [Join the conversation](https://github.com/Enes-CE/AI-Powered_Cover_Letter_Generator/discussions)
-- **Email**: [Contact us](mailto:c.enes.eng@gmail.com)
+- 🔗 **LinkedIn**: [ibrahim-enes-ulusoy](https://www.linkedin.com/in/ibrahim-enes-ulusoy-9646551b9/)
+- 🌐 **Portfolio**: [enesulusoy-portfolio.netlify.app](https://enesulusoy-portfolio.netlify.app)
+- 📧 **Email**: [c.enes.eng@gmail.com](mailto:c.enes.eng@gmail.com)
 
 ---
 
 <div align="center">
 
-**Made with ❤️ using AI and modern web technologies**
-
 [![GitHub stars](https://img.shields.io/github/stars/Enes-CE/AI-Powered_Cover_Letter_Generator?style=social)](https://github.com/Enes-CE/AI-Powered_Cover_Letter_Generator/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Enes-CE/AI-Powered_Cover_Letter_Generator?style=social)](https://github.com/Enes-CE/AI-Powered_Cover_Letter_Generator/network)
-[![GitHub issues](https://img.shields.io/github/issues/Enes-CE/AI-Powered_Cover_Letter_Generator)](https://github.com/Enes-CE/AI-Powered_Cover_Letter_Generator/issues)
 
 </div>
